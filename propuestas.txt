@@ -1,1 +1,0 @@
-tecnologías -> docker, Javascript con nodeJS, redis cache.

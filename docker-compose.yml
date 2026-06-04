@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  clinica_db:
+    image: postgres:15-alpine
+    container_name: shared_clinica_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: clinica_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./BD/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_shared_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d clinica_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clinica_network
+
+  sistema_tickets:
+    build:
+      context: ./sistema_tickets
+      dockerfile: Dockerfile
+    container_name: sistema_tickets_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_USER=admin
+      - DB_PASSWORD=secretpassword
+      - DB_HOST=clinica_db
+      - DB_PORT=5432
+      - DB_NAME=clinica_db
+      - PORT=3000
+    depends_on:
+      clinica_db:
+        condition: service_healthy
+    networks:
+      - clinica_network
+    
+  #sistema_fichas:
+    # build:
+    #   context: ./ruta_a_otro_servicio
+    #   dockerfile: Dockerfile
+    # container_name: otro_servicio_app
+    # restart: always
+    # ports:
+    #   - "puerto_host:puerto_contenedor"
+    # environment:
+    #   - VAR1=valor1
+    #   - VAR2=valor2
+    # depends_on:
+    #   clinica_db:
+    #     condition: service_healthy
+    # networks:
+    #   - clinica_network 
+
+volumes:
+  postgres_shared_data:
+
+networks:
+  clinica_network:
+    driver: bridge

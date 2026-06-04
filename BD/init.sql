@@ -1,8 +1,8 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; -- Habilita la extension para generar UUIDs
 
-CREATE TYPE IF NOT EXISTS estado_ticket AS ENUM ('EN_ESPERA', 'LLAMADO', 'ATENDIDO');
-CREATE TYPE IF NOT EXISTS tipo_personal AS ENUM ('MEDICO', 'ENFERMERA', 'ADMINISTRATIVO');
-CREATE TYPE IF NOT EXISTS estado_pago AS ENUM ('PENDIENTE', 'CANCELADO', 'PAGADO');
+CREATE TYPE estado_ticket AS ENUM ('EN_ESPERA', 'LLAMADO', 'ATENDIDO');
+CREATE TYPE tipo_personal AS ENUM ('MEDICO', 'ENFERMERA', 'ADMINISTRATIVO');
+CREATE TYPE estado_pago AS ENUM ('PENDIENTE', 'CANCELADO', 'PAGADO');
 
 CREATE TABLE IF NOT EXISTS pacientes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -80,3 +80,20 @@ CREATE TABLE IF NOT EXISTS derivaciones_examenes (
 CREATE INDEX idx_tickets_estado ON tickets(estado);
 CREATE INDEX idx_atenciones_medico ON atenciones_medicas(medico_id);
 CREATE INDEX idx_fichas_paciente ON fichas_clinicas(paciente_id);
+
+INSERT INTO pacientes (rut, nombres, apellidos, fecha_nacimiento) VALUES 
+('11111111-1', 'Juan', 'Perez', '1990-01-01'),
+('22222222-2', 'Maria', 'Gomez', '1992-02-02'),
+('33333333-3', 'Pedro', 'Lopez', '1988-03-03'),
+('44444444-4', 'Ana', 'Diaz', '1995-04-04'),
+('55555555-5', 'Luis', 'Torres', '1993-05-05')
+ON CONFLICT (rut) DO NOTHING;
+
+-- Insertar áreas de atención precargadas
+INSERT INTO areas_atencion (nombre) VALUES 
+('Medicina General'),
+('Pediatría'),
+('Odontología'),
+('Traumatología'),
+('Ginecología')
+ON CONFLICT DO NOTHING;

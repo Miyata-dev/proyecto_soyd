@@ -1,0 +1,13 @@
+# Dependencias
+node_modules/
+
+# Logs de error y debug
+npm-debug.log
+yarn-debug.log
+
+# Carpetas de Docker que no deben subirse
+.docker-container-data/
+.DS_Store
+
+# Carpetas de VS Code
+.vscode/

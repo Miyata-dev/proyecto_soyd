@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: secretpassword
       POSTGRES_DB: clinica_db
     ports:
-      - "5433:5432"
+      - "5433:5432" # Expuesto solo para pruebas locales con un cliente de BD
     volumes:
       - ./BD/init.sql:/docker-entrypoint-initdb.d/init.sql
       - postgres_shared_data:/var/lib/postgresql/data
@@ -22,14 +22,33 @@ services:
     networks:
       - clinica_network
 
+  # --- NUEVO: Capa de Seguridad (API Gateway) ---
+  api_gateway:
+    build:
+      context: ./api_gateway
+      dockerfile: Dockerfile
+    container_name: api_gateway_app
+    restart: always
+    ports:
+      - "8080:8080" # Único puerto expuesto hacia el exterior
+    environment:
+      - PORT=8080
+      # Apuntamos a los nombres de los contenedores internamente
+      - URL_FICHAS=http://sistema_fichas_app:3000
+      - URL_TICKETS=http://sistema_tickets_app:3000
+    depends_on:
+      - sistema_fichas
+      - sistema_tickets
+    networks:
+      - clinica_network
+
   sistema_tickets:
     build:
       context: ./sistema_tickets
       dockerfile: Dockerfile
     container_name: sistema_tickets_app
     restart: always
-    ports:
-      - "3000:3000"
+    # Eliminamos "ports" para aislarlo detrás del Gateway
     environment:
       - DB_USER=admin
       - DB_PASSWORD=secretpassword
@@ -49,14 +68,14 @@ services:
         dockerfile: Dockerfile
       container_name: sistema_fichas_app
       restart: always
-      ports:
-        - "3001:3000" 
+      # Eliminamos "ports" para aislarlo detrás del Gateway
       environment:
         - DB_USER=admin
         - DB_PASSWORD=secretpassword
         - DB_HOST=clinica_db
         - DB_PORT=5432
         - DB_NAME=clinica_db
+        - PORT=3000 # Añadido por seguridad para que coincida con tu index.js
       depends_on:
         clinica_db:
           condition: service_healthy

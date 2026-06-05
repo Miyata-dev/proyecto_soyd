@@ -1,0 +1,26 @@
+{
+  "name": "proyecto_soyd",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Miyata-dev/proyecto_soyd.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Miyata-dev/proyecto_soyd/issues"
+  },
+  "homepage": "https://github.com/Miyata-dev/proyecto_soyd#readme",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "http-proxy-middleware": "^4.0.0"
+  }
+}

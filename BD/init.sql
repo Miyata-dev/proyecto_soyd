@@ -97,3 +97,10 @@ INSERT INTO areas_atencion (nombre) VALUES
 ('Traumatología'),
 ('Ginecología')
 ON CONFLICT DO NOTHING;
+
+-- Insertar personal de prueba
+INSERT INTO personal (rut, nombres, apellidos, rol) VALUES 
+('66666666-6', 'Carlos', 'Medina', 'MEDICO'),
+('77777777-7', 'Laura', 'Sanchez', 'ENFERMERA'),
+('88888888-8', 'Roberto', 'Admin', 'ADMINISTRATIVO')
+ON CONFLICT (rut) DO NOTHING;

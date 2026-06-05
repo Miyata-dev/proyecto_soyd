@@ -1,0 +1,70 @@
+Abrir la base de datos (Docker)
+cd  \Users\adare\OneDrive\Escritorio\proyecto_soyd
+//Elimina
+docker-compose down -v
+
+//Inicializa el sistema
+docker-compose up --build -d 
+
+Abrir Postman
+
+//Obtener id de los pacientes
+docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT nombres, apellidos, id FROM pacientes;"
+
+//Obtener id del medico
+docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT id, nombres, apellidos FROM personal WHERE rol = 'MEDICO';"
+
+GET -> http://localhost:3001/api/fichas
+Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+
+POST -> http://localhost:3001/api/fichas
+- Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+- Body 
+raw:
+{
+  "paciente_id": "id_paciente_comando_debe_coindir_con_GET_tickets"
+}
+
+GET -> http://localhost:3001/api/fichas/id_paciente/historial
+Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+
+GET -> http://localhost:3001/api/atenciones
+Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+
+POST -> http://localhost:3001/api/fichas/atenciones
+- Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+- Body 
+raw:
+{
+  "ficha_id": "id_ficha_en_GET_ficha",
+  "medico_id": "id_medico_comando", 
+  "ticket_asociado_id": "id_ticket_en_GET_ticket", 
+  "diagnostico": "Paciente presenta cuadro de amigdalitis",
+  "observaciones": "Se recomienda reposo por 3 días"
+}
+
+PATCH -> http://localhost:3001/api/atenciones/id_atencion_GET_ateenciones
+- Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA
+- Body 
+raw:
+{
+  "diagnostico": "Faringitis viral",
+  "observaciones": "Tomar abundante agua, paracetamol cada 8 horas en caso de dolor."
+}
+
+DELETE -> http://localhost:3001/api/atenciones/id_atenciones
+- Headers:
+Key                        Value
+x-user-role                MEDICO ó ENFERMERA

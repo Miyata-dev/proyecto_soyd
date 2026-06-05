@@ -43,22 +43,25 @@ services:
     networks:
       - clinica_network
     
-  #sistema_fichas:
-    # build:
-    #   context: ./ruta_a_otro_servicio
-    #   dockerfile: Dockerfile
-    # container_name: otro_servicio_app
-    # restart: always
-    # ports:
-    #   - "puerto_host:puerto_contenedor"
-    # environment:
-    #   - VAR1=valor1
-    #   - VAR2=valor2
-    # depends_on:
-    #   clinica_db:
-    #     condition: service_healthy
-    # networks:
-    #   - clinica_network 
+  sistema_fichas:
+      build:
+        context: ./sistema_fichas
+        dockerfile: Dockerfile
+      container_name: sistema_fichas_app
+      restart: always
+      ports:
+        - "3001:3000" 
+      environment:
+        - DB_USER=admin
+        - DB_PASSWORD=secretpassword
+        - DB_HOST=clinica_db
+        - DB_PORT=5432
+        - DB_NAME=clinica_db
+      depends_on:
+        clinica_db:
+          condition: service_healthy
+      networks:
+        - clinica_network
 
 volumes:
   postgres_shared_data:

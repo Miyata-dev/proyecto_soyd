@@ -11,3 +11,4 @@ yarn-debug.log
 
 # Carpetas de VS Code
 .vscode/
+package-lock.json

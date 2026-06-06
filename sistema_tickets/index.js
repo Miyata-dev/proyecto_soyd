@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const { Pool } = require('pg');
+const Redis = require('ioredis'); //redis cache
 
 // Inicializa la aplicación
 const app = express();
@@ -29,10 +30,31 @@ pool.connect()
     .then(() => console.log('Conectado exitosamente a PostgreSQL (Docker)'))
     .catch(err => console.error('Error al conectar a PostgreSQL', err.stack));
 
+
+const redis = new Redis({
+    host: process.env.REDIS_HOST || 'clinica_redis',
+    port: 6379
+});
+const CACHE_KEY = 'tickets:todos';
+const CACHE_TTL = 30; // segundos
+
 // 1. GET: Obtener todos los tickets
 app.get('/api/tickets', async (req, res) => {
     try {
+        // 1. Revisar cache
+        const cached = await redis.get(CACHE_KEY);
+        if (cached) {
+            console.log('Cache HIT - tickets desde Redis');
+            return res.json(JSON.parse(cached));
+        }
+
+        // 2. Cache miss → consultar BD
+        console.log('Cache MISS - consultando PostgreSQL');
         const result = await pool.query('SELECT * FROM tickets ORDER BY fecha_creacion DESC');
+        
+        // 3. Guardar en Redis con expiración
+        await redis.setex(CACHE_KEY, CACHE_TTL, JSON.stringify(result.rows));
+        
         res.json(result.rows);
     } catch (error) {
         console.error('Error al obtener tickets:', error);
@@ -53,6 +75,7 @@ app.post('/api/tickets', async (req, res) => {
         const values = [paciente_id, area_id, numero_atencion];
         const result = await pool.query(query, values);
         
+        await redis.del(CACHE_KEY);
         // Respondemos a Postman con el ticket real creado en la BD
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -83,6 +106,7 @@ app.patch('/api/tickets/:id/llamar', async (req, res) => {
         // Emitimos el evento a todas las pantallas conectadas
         io.emit('nuevo_llamado', ticketActualizado);
 
+        await redis.del(CACHE_KEY)
         // Respondemos a la interfaz que hizo la llamada
         res.json(ticketActualizado);
     } catch (error) {
@@ -97,6 +121,7 @@ app.delete('/api/tickets/:id', async (req, res) => {
     try {
         const result = await pool.query('DELETE FROM tickets WHERE id = $1', [id]);
         if (result.rowCount === 0) return res.status(404).json({ error: "Ticket no encontrado" });
+         await redis.del(CACHE_KEY);
         res.json({ message: "Ticket eliminado correctamente" });
     } catch (error) {
         res.status(500).json({ error: 'Error al eliminar el ticket' });

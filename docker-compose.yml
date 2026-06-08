@@ -56,6 +56,7 @@ services:
       - DB_PORT=5432
       - DB_NAME=clinica_db
       - PORT=3000
+      - REDIS_HOST=clinica_redis   # redis para el cache
     depends_on:
       clinica_db:
         condition: service_healthy
@@ -82,6 +83,15 @@ services:
       networks:
         - clinica_network
 
+  redis:
+      image: redis:7-alpine
+      container_name: clinica_redis
+      restart: always
+      ports:
+        - "6379:6379"
+      networks:
+        - clinica_network  
+   
 volumes:
   postgres_shared_data:
 

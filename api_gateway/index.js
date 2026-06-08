@@ -49,5 +49,5 @@ app.use('/api/tickets', createProxyMiddleware({
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🛡️ API Gateway ejecutándose en el puerto ${PORT}`);
+    console.log(`API Gateway ejecutándose en el puerto ${PORT}`);
 });

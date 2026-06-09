@@ -6,7 +6,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Configuración de conexión a la base de datos compartida
 const pool = new Pool({
     user: process.env.DB_USER || 'admin',
     password: process.env.DB_PASSWORD || 'secretpassword',
@@ -25,7 +24,7 @@ const verificarPersonalAutorizado = (req, res, next) => {
     }
 };
 
-// 1. GET: Obtener todas las fichas (La ruta que te faltaba para Postman)
+// 1. GET: Obtener todas las fichas
 app.get('/api/fichas', verificarPersonalAutorizado, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM fichas_clinicas ORDER BY fecha_creacion DESC');
@@ -115,29 +114,6 @@ app.patch('/api/atenciones/:id', verificarPersonalAutorizado, async (req, res) =
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error al actualizar la atención' });
-    }
-});
-
-// 6. DELETE: Eliminar una atención médica específica
-app.delete('/api/atenciones/:id', verificarPersonalAutorizado, async (req, res) => {
-    const { id } = req.params;
-
-    try {
-        const result = await pool.query(
-            'DELETE FROM atenciones_medicas WHERE id = $1 RETURNING *',
-            [id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Atención médica no encontrada' });
-        }
-
-        res.json({ 
-            mensaje: 'Atención médica eliminada con éxito', 
-            atencion_eliminada: result.rows[0] 
-        });
-    } catch (error) {
-        res.status(500).json({ error: 'Error al eliminar la atención' });
     }
 });
 

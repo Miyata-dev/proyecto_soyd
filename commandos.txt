@@ -1,0 +1,6 @@
+docker-compose up --build 
+docker compose down
+
+docker exec -it shared_clinica_postgres psql -U admin -d clinica_db //obtener acceso a la clinica_db
+SELECT id, nombres, apellidos FROM pacientes; //obtener pacientes
+SELECT id, nombres, apellidos FROM personal; //obtener personal

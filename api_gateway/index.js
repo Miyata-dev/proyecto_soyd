@@ -1,12 +1,11 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
-const { Pool } = require('pg'); // <-- 1. Importamos la librería de BD
+const { Pool } = require('pg');
 
 const app = express();
 app.use(cors());
 
-// <-- 2. Creamos la conexión a PostgreSQL para el Gateway
 const pool = new Pool({
     user: process.env.DB_USER || 'admin',
     password: process.env.DB_PASSWORD || 'secretpassword',
@@ -15,16 +14,15 @@ const pool = new Pool({
     database: process.env.DB_NAME || 'clinica_db'
 });
 
-// <-- 3. Agregamos "async" a la función
 const verificarIdentidad = async (req, res, next) => {
     const userId = req.headers['x-user-id'];
+    const userRoleClient = req.headers['x-user-role'];
 
     if (!userId) {
         return res.status(401).json({ error: "Acceso denegado: Falta ID de usuario en los headers" });
     }
 
     try {
-        // Consultamos a la base de datos si el ID es real
         const result = await pool.query(
             'SELECT rol, activo FROM personal WHERE id = $1',
             [userId]
@@ -40,12 +38,22 @@ const verificarIdentidad = async (req, res, next) => {
             return res.status(403).json({ error: "Acceso denegado: El usuario está inactivo" });
         }
 
-        // Si intenta entrar a fichas, verificamos el rol
-        if (req.path.startsWith('/api/fichas') && !['MEDICO', 'ENFERMERA'].includes(usuario.rol)) {
-            return res.status(403).json({ error: "Acceso bloqueado en Gateway: Solo personal médico/enfermería puede acceder a fichas." });
+        //se encarga de que si tenga el rol.
+        if (usuario.rol !== userRoleClient) {
+            return res.status(403).json({
+                error: `Alerta de Seguridad: El rol enviado (${userRoleClient}) no coincide con su rol real (${usuario.rol})`
+            });
         }
 
-        // Si pasó todas las pruebas, lo dejamos seguir hacia los microservicios
+        const esRutaFichaClinica = req.path.startsWith('/api/fichas') || req.path.startsWith('/api/atenciones');
+
+        if (esRutaFichaClinica && !['MEDICO', 'ENFERMERA'].includes(usuario.rol)) {
+            return res.status(403).json({
+                error: "Acceso bloqueado en Gateway: Solo personal médico/enfermería puede acceder a la información clínica."
+            });
+        }
+
+        req.headers['x-user-role'] = usuario.rol;
         next();
 
     } catch (error) {

@@ -20,7 +20,7 @@ const pool = mariadb.createPool({
     database: process.env.DB_NAME || 'tickets_db'
 });
 
-// Verificar conexión a la BD
+
 pool.connect()
     .then(() => console.log('Conectado exitosamente a PostgreSQL (Docker)'))
     .catch(err => console.error('Error al conectar a PostgreSQL', err.stack));

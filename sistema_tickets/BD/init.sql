@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS areas_atencion (
 
 CREATE TABLE IF NOT EXISTS tickets (
   id CHAR(36) PRIMARY KEY DEFAULT UUID(),
-  paciente_id CHAR(36) NOT NULL, -- Referencia lógica a App 2 (PostgreSQL)
+  paciente_id CHAR(36) NOT NULL, -- Referencia a la a App 2 (PostgreSQL)
   area_id INT NOT NULL,
   numero_atencion VARCHAR(10) NOT NULL, 
   estado ENUM('EN_ESPERA', 'LLAMADO', 'ATENDIDO') DEFAULT 'EN_ESPERA', 

@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS movimientos_bodega (
   inventario_id CHAR(36) NOT NULL,
   tipo_movimiento ENUM('INGRESO', 'EGRESO', 'AJUSTE') NOT NULL,
   cantidad INT NOT NULL,
-  personal_solicitante_id CHAR(36), -- Referencia lógica a App 2
+  personal_solicitante_id CHAR(36), -- Referencia a la App 2
   fecha_movimiento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   observaciones TEXT,
   FOREIGN KEY (inventario_id) REFERENCES inventario(id)

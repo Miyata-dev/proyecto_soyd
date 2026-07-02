@@ -24,6 +24,22 @@ const verificarPersonalAutorizado = (req, res, next) => {
     }
 };
 
+app.get('/api/auth/verify', async (req, res) => {
+    const userId = req.headers['x-user-id'];
+    try {
+        const result = await pool.query('SELECT rol, activo FROM personal WHERE id = $1', [userId]);
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: "Usuario no existe" });
+        }
+        if (!result.rows[0].activo) {
+            return res.status(403).json({ error: "Usuario inactivo" });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: "Error validando en BD Fichas" });
+    }
+});
+
 // 1. GET: Obtener todas las fichas
 app.get('/api/fichas', verificarPersonalAutorizado, async (req, res) => {
     try {
@@ -131,9 +147,9 @@ app.delete('/api/atenciones/:id', verificarPersonalAutorizado, async (req, res) 
             return res.status(404).json({ error: 'Atención médica no encontrada' });
         }
 
-        res.json({ 
-            mensaje: 'Atención médica eliminada con éxito', 
-            atencion_eliminada: result.rows[0] 
+        res.json({
+            mensaje: 'Atención médica eliminada con éxito',
+            atencion_eliminada: result.rows[0]
         });
     } catch (error) {
         res.status(500).json({ error: 'Error al eliminar la atención' });

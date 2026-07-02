@@ -1,99 +1,121 @@
 version: '3.8'
 
 services:
-  clinica_db:
-    image: postgres:15-alpine
-    container_name: shared_clinica_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: clinica_db
-    ports:
-      - "5433:5432" # Expuesto solo para pruebas locales con un cliente de BD
-    volumes:
-      - ./BD/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - postgres_shared_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d clinica_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - clinica_network
-
-  # --- NUEVO: Capa de Seguridad (API Gateway) ---
   api_gateway:
     build:
       context: ./api_gateway
-      dockerfile: Dockerfile
     container_name: api_gateway_app
     restart: always
     ports:
-      - "8080:8080" # Único puerto expuesto hacia el exterior
+      - "8080:8080" 
     environment:
       - PORT=8080
-      # Apuntamos a los nombres de los contenedores internamente
       - URL_FICHAS=http://sistema_fichas_app:3000
       - URL_TICKETS=http://sistema_tickets_app:3000
+      - URL_BODEGA=http://sistema_bodega_app:3000
     depends_on:
       - sistema_fichas
       - sistema_tickets
     networks:
       - clinica_network
 
+  tickets_db:
+    build:
+      context: ./sistema_tickets/BD
+    container_name: tickets_mariadb
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: tickets_db
+      MARIADB_USER: admin
+      MARIADB_PASSWORD: secretpassword
+    ports:
+      - "3308:3306" # Para pruebas locales
+    volumes:
+      - mariadb_tickets_data:/var/lib/mysql
+    networks:
+      - clinica_network
+
   sistema_tickets:
     build:
       context: ./sistema_tickets
-      dockerfile: Dockerfile
     container_name: sistema_tickets_app
     restart: always
-    # Eliminamos "ports" para aislarlo detrás del Gateway
     environment:
       - DB_USER=admin
       - DB_PASSWORD=secretpassword
-      - DB_HOST=clinica_db
-      - DB_PORT=5432
-      - DB_NAME=clinica_db
+      - DB_HOST=tickets_db
+      - DB_PORT=3306
+      - DB_NAME=tickets_db
       - PORT=3000
-      - REDIS_HOST=clinica_redis   # redis para el cache
+      - REDIS_HOST=clinica_redis
     depends_on:
-      clinica_db:
-        condition: service_healthy
+      - tickets_db
+      - redis
     networks:
       - clinica_network
-    
+
+  fichas_db:
+    build:
+      context: ./sistema_fichas/BD
+    container_name: fichas_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: fichas_db
+    ports:
+      - "5432:5432" # Para pruebas locales
+    volumes:
+      - postgres_fichas_data:/var/lib/postgresql/data
+    networks:
+      - clinica_network
+
   sistema_fichas:
-      build:
-        context: ./sistema_fichas
-        dockerfile: Dockerfile
-      container_name: sistema_fichas_app
-      restart: always
-      # Eliminamos "ports" para aislarlo detrás del Gateway
-      environment:
-        - DB_USER=admin
-        - DB_PASSWORD=secretpassword
-        - DB_HOST=clinica_db
-        - DB_PORT=5432
-        - DB_NAME=clinica_db
-        - PORT=3000 # Añadido por seguridad para que coincida con tu index.js
-      depends_on:
-        clinica_db:
-          condition: service_healthy
-      networks:
-        - clinica_network
+    build:
+      context: ./sistema_fichas
+    container_name: sistema_fichas_app
+    restart: always
+    environment:
+      - DB_USER=admin
+      - DB_PASSWORD=secretpassword
+      - DB_HOST=fichas_db
+      - DB_PORT=5432
+      - DB_NAME=fichas_db
+      - PORT=3000
+    depends_on:
+      - fichas_db
+    networks:
+      - clinica_network
+
+  bodega_db:
+    build:
+      context: ./sistema_bodega/BD
+    container_name: bodega_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: bodega_db
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: secretpassword
+    ports:
+      - "3307:3306" #
+    volumes:
+      - mysql_bodega_data:/var/lib/mysql
+    networks:
+      - clinica_network
 
   redis:
-      image: redis:7-alpine
-      container_name: clinica_redis
-      restart: always
-      ports:
-        - "6379:6379"
-      networks:
-        - clinica_network  
-   
+    image: redis:7-alpine
+    container_name: clinica_redis
+    restart: always
+    networks:
+      - clinica_network
+
 volumes:
-  postgres_shared_data:
+  mariadb_tickets_data:
+  postgres_fichas_data:
+  mysql_bodega_data:
 
 networks:
   clinica_network:

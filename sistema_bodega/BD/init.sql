@@ -31,3 +31,13 @@ INSERT INTO categorias_insumos (nombre, descripcion) VALUES
 ('Fármacos Analgésicos', 'Medicamentos para el dolor'),
 ('Insumos Quirúrgicos', 'Material estéril para pabellón'),
 ('Insumos Generales', 'Jeringas, gasas, guantes');
+
+-- Insertar productos de prueba
+INSERT INTO inventario (categoria_id, codigo_producto, nombre_producto, cantidad_stock, stock_critico, unidad_medida) VALUES 
+(1, 'FAR-001', 'Paracetamol 500mg (Caja x20)', 150, 20, 'Cajas'),
+(1, 'FAR-002', 'Amoxicilina 500mg (Caja x10)', 80, 15, 'Cajas'),
+(1, 'FAR-003', 'Adrenalina 1mg/ml (Ampolla)', 45, 10, 'Ampollas'),
+(2, 'QUI-001', 'Jeringa Desechable 5ml c/aguja', 500, 100, 'Unidades'),
+(2, 'QUI-002', 'Bisturí Desechable N°15', 200, 30, 'Unidades'),
+(3, 'GEN-001', 'Guantes de Látex Estériles (Par)', 350, 50, 'Pares'),
+(3, 'GEN-002', 'Gasa Estéril 10x10cm (Sobre)', 600, 100, 'Sobres');

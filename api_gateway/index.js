@@ -27,7 +27,6 @@ const verificarIdentidad = async (req, res, next) => {
 
         const usuario = await response.json();
 
-        // Verificamos el rol
         if (usuario.rol !== userRoleClient) {
             return res.status(403).json({
                 error: `Alerta: El rol enviado (${userRoleClient}) no coincide con el real (${usuario.rol})`
@@ -50,13 +49,47 @@ const verificarIdentidad = async (req, res, next) => {
     }
 };
 
-app.use('/api', verificarIdentidad);
+//se aplica el middleware de verificación de identidad a todas las rutas
+app.use(verificarIdentidad);
+const fixProxyHeaders = (proxyReq, req, res) => {
+    if (req.headers['x-user-id']) {
+        proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+    }
+    if (req.headers['x-user-role']) {
+        proxyReq.setHeader('x-user-role', req.headers['x-user-role']);
+    }
 
-app.use('/api/fichas', createProxyMiddleware({ target: process.env.URL_FICHAS || 'http://localhost:3000', changeOrigin: true }));
-app.use('/api/atenciones', createProxyMiddleware({ target: process.env.URL_FICHAS || 'http://localhost:3000', changeOrigin: true }));
-app.use('/api/tickets', createProxyMiddleware({ target: process.env.URL_TICKETS || 'http://localhost:3001', changeOrigin: true }));
-// Preparado para la app de Astrid
-app.use('/api/bodega', createProxyMiddleware({ target: process.env.URL_BODEGA || 'http://localhost:3002', changeOrigin: true }));
+    if (req.body && Object.keys(req.body).length) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader('Content-Type', 'application/json');
+        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+    }
+};
+
+app.use('/api/fichas', createProxyMiddleware({
+    target: process.env.URL_FICHAS || 'http://localhost:3000',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
+
+app.use('/api/atenciones', createProxyMiddleware({
+    target: process.env.URL_FICHAS || 'http://localhost:3000',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
+
+app.use('/api/tickets', createProxyMiddleware({
+    target: process.env.URL_TICKETS || 'http://localhost:3001',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
+
+app.use('/api/bodega', createProxyMiddleware({
+    target: process.env.URL_BODEGA || 'http://localhost:3002',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`API Gateway ejecutándose en puerto ${PORT}`));

@@ -1,0 +1,48 @@
+Abrir la base de datos (Docker)
+cd  \Users\adare\OneDrive\Escritorio\proyecto_soyd
+//Elimina
+docker-compose down -v
+
+//Inicializa el sistema
+docker-compose up --build -d 
+
+Abrir Postman
+
+//Obtener id de los pacientes
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, apellidos, id FROM pacientes;"
+
+//Obtener id del personal
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, rol, id FROM personal;"
+
+//Ver las categorías creadas en la bodega
+docker exec -it bodega_mysql mysql -u admin -psecretpassword bodega_db -e "SELECT id, nombre FROM categorias_insumos;
+
+GET -> http://localhost:8080/api/bodega/status
+(Verifica el monitoreo y estado de los servidores Master y Réplica)
+Headers:
+Key                        Value
+x-user-id                  id_personal
+x-user-role                MEDICO ó ENFERMERA
+
+GET -> http://localhost:8080/api/bodega/inventario
+(Consulta el stock disponible. Opera en Modo Lectura desde la Réplica)
+Headers:
+Key                        Value
+x-user-id                  id_personal
+x-user-role                MEDICO ó ENFERMERA
+
+POST -> http://localhost:8080/api/bodega/despachar
+(Descuenta stock del insumo en el Master y genera el registro de auditoría)
+Headers:
+Key                        Value
+x-user-id                  id_personal
+x-user-role                MEDICO ó ENFERMERA 
+
+Body
+raw (JSON):
+{
+"codigo_producto": "FAR-001",
+"cantidad": 2,
+"personal_solicitante_id": "id_personal",
+"observaciones": "Despacho solicitado para paciente en pabellón"
+}

@@ -21,9 +21,9 @@ const pool = mariadb.createPool({
 });
 
 
-pool.connect()
-    .then(() => console.log('Conectado exitosamente a PostgreSQL (Docker)'))
-    .catch(err => console.error('Error al conectar a PostgreSQL', err.stack));
+pool.getConnection()
+    .then(() => console.log('Conectado exitosamente a MariaDB'))
+    .catch(err => console.error('Error al conectar a MariaDB', err.stack));
 
 
 const redis = new Redis({
@@ -44,13 +44,13 @@ app.get('/api/tickets', async (req, res) => {
         }
 
         // 2. Cache miss → consultar BD
-        console.log('Cache MISS - consultando PostgreSQL');
+        console.log('Cache MISS - consultando MariaDB');
         const result = await pool.query('SELECT * FROM tickets ORDER BY fecha_creacion DESC');
 
         // 3. Guardar en Redis con expiración
-        await redis.setex(CACHE_KEY, CACHE_TTL, JSON.stringify(result.rows));
+        await redis.setex(CACHE_KEY, CACHE_TTL, JSON.stringify(result));
 
-        res.json(result.rows);
+        res.json(result);
     } catch (error) {
         console.error('Error al obtener tickets:', error);
         res.status(500).json({ error: 'Error interno del servidor' });
@@ -72,38 +72,41 @@ app.post('/api/tickets', async (req, res) => {
 
         await redis.del(CACHE_KEY);
         // Respondemos a Postman con el ticket real creado en la BD
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(result[0]);
     } catch (error) {
         console.error('Error al crear ticket:', error);
         res.status(500).json({ error: 'Error interno del servidor al crear el ticket' });
     }
 });
 
-// 3. PATCH: Llamar al Paciente (Y emitir WebSocket)
+// 3. PATCH: Llamar al Paciente 
 app.patch('/api/tickets/:id/llamar', async (req, res) => {
     const ticketId = req.params.id;
 
     try {
-        const query = `
+        // 1. Ejecutamos el UPDATE sin el RETURNING que causaba el conflicto en MariaDB
+        const queryUpdate = `
             UPDATE tickets 
             SET estado = 'LLAMADO', fecha_llamado = CURRENT_TIMESTAMP 
-            WHERE id = ? 
-            RETURNING *;
+            WHERE id = ?;
         `;
-        const result = await pool.query(query, [ticketId]);
+        const resultUpdate = await pool.query(queryUpdate, [ticketId]);
 
-        if (result.rows.length === 0) {
+        // 2. En MariaDB validamos con affectedRows si el ID existía
+        if (resultUpdate.affectedRows === 0) {
             return res.status(404).json({ error: "Ticket no encontrado en la base de datos" });
         }
 
-        const ticketActualizado = result.rows[0];
+        // 3. Consultamos el ticket recién actualizado para enviarlo al WebSocket y al usuario
+        const ticketActualizado = await pool.query('SELECT * FROM tickets WHERE id = ?', [ticketId]);
 
         // Emitimos el evento a todas las pantallas conectadas
-        io.emit('nuevo_llamado', ticketActualizado);
+        io.emit('nuevo_llamado', ticketActualizado[0]);
 
-        await redis.del(CACHE_KEY)
+        await redis.del(CACHE_KEY);
+        
         // Respondemos a la interfaz que hizo la llamada
-        res.json(ticketActualizado);
+        res.json(ticketActualizado[0]);
     } catch (error) {
         console.error('Error al llamar paciente:', error);
         res.status(500).json({ error: 'Error interno del servidor al actualizar el ticket' });
@@ -126,5 +129,5 @@ app.delete('/api/tickets/:id', async (req, res) => {
 // Arrancar el servidor
 const PORT = 3000;
 server.listen(PORT, () => {
-    console.log(`Servidor corriendo en puerto ${PORT} (Conectado a Docker)`);
+    console.log(`Servidor de Tickets corriendo en puerto ${PORT}`);
 });

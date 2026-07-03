@@ -9,9 +9,9 @@ app.use(express.json());
 const pool = new Pool({
     user: process.env.DB_USER || 'admin',
     password: process.env.DB_PASSWORD || 'secretpassword',
-    host: process.env.DB_HOST || 'clinica_db',
+    host: process.env.DB_HOST || 'fichas_db',
     port: process.env.DB_PORT || 5432,
-    database: process.env.DB_NAME || 'clinica_db'
+    database: process.env.DB_NAME || 'fichas_db'
 });
 
 // Middleware simple de autorización

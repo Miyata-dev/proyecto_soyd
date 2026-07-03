@@ -1,5 +1,7 @@
 docker-compose up --build 
+docker ps
 docker compose down
+docker-compose down --remove-orphans
 
 docker exec -it shared_clinica_postgres psql -U admin -d clinica_db //obtener acceso a la clinica_db
 SELECT id, nombres, apellidos FROM pacientes; //obtener pacientes

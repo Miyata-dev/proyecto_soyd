@@ -9,10 +9,10 @@ docker-compose up --build -d
 Abrir Postman
 
 //Obtener id de los pacientes
-docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT nombres, apellidos, id FROM pacientes;"
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, apellidos, id FROM pacientes;"
 
-//Obtener id del medico
-docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT id, nombres, apellidos FROM personal WHERE rol = 'MEDICO';"
+//Obtener id del personal
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, rol, id FROM personal;"
 
 GET -> http://localhost:3001/api/fichas
 Headers:

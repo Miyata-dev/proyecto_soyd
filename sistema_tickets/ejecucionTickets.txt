@@ -10,10 +10,13 @@ docker-compose up --build -d
 Abrir Postman
 
 //Obtener id de los pacientes
-docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT nombres, apellidos, id FROM pacientes;"
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, apellidos, id FROM pacientes;"
 
 //Obtener id del area_id
-docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "SELECT id, nombre FROM areas_atencion;"
+docker exec -it tickets_mariadb mysql -u admin -psecretpassword tickets_db -e "SELECT id, nombre FROM areas_atencion;"
+
+//Obtener id del personal
+docker exec -it fichas_postgres psql -U admin -d fichas_db -c "SELECT nombres, rol, id FROM personal;"
 
 // Eliminar toda la bese de datos
 docker exec -it shared_clinica_postgres psql -U admin -d clinica_db -c "DELETE FROM tickets;" 

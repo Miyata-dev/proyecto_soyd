@@ -36,22 +36,6 @@ CREATE TABLE IF NOT EXISTS atenciones_medicas (
   fecha_atencion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS recetas (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  atencion_id UUID NOT NULL REFERENCES atenciones_medicas(id),
-  medicamentos TEXT NOT NULL,
-  indicaciones TEXT NOT NULL,
-  fecha_emision TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS derivaciones_examenes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  atencion_id UUID NOT NULL REFERENCES atenciones_medicas(id),
-  tipo_examen VARCHAR(100) NOT NULL,
-  estado VARCHAR(20) DEFAULT 'SOLICITADO',
-  fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE INDEX idx_atenciones_medico ON atenciones_medicas(medico_id);
 CREATE INDEX idx_fichas_paciente ON fichas_clinicas(paciente_id);
 
@@ -61,4 +45,5 @@ INSERT INTO pacientes (rut, nombres, apellidos, fecha_nacimiento) VALUES
 
 INSERT INTO personal (rut, nombres, apellidos, rol) VALUES 
 ('66666666-6', 'Carlos', 'Medina', 'MEDICO'),
-('77777777-7', 'Laura', 'Sanchez', 'ENFERMERA');
+('77777777-7', 'Laura', 'Sanchez', 'ENFERMERA'),
+('88888888-8', 'Roberto', 'Admin', 'ADMINISTRATIVO');

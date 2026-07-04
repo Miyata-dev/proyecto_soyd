@@ -135,7 +135,7 @@ services:
     networks:
       - clinica_network
 
-frontend_clinica:
+  frontend_clinica:
     build:
       context: ./frontend-clinica
     container_name: frontend_clinica_app

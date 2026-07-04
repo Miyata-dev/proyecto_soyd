@@ -1,16 +1,12 @@
-FROM node:20-alpine
+FROM eclipse-temurin:21-jdk
 
 WORKDIR /app
 
-# Copia solo los archivos de configuración
-COPY package.json ./
+COPY pom.xml ./
+COPY src ./src
 
-# Instala las dependencias
-RUN npm install
-
-# Copia todo el resto del código fuente
-COPY . .
+RUN apt-get update && apt-get install -y maven && mvn -q -DskipTests package
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["java", "-jar", "target/sistema-tickets-1.0.0.jar"]

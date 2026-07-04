@@ -53,8 +53,9 @@ services:
       - DB_HOST=tickets_db
       - DB_PORT=3306
       - DB_NAME=tickets_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - PORT=3000
-      - REDIS_HOST=clinica_redis
     depends_on:
       - tickets_db
       - redis
@@ -135,7 +136,7 @@ services:
     networks:
       - clinica_network
 
-frontend_clinica:
+  frontend_clinica:
     build:
       context: ./frontend-clinica
     container_name: frontend_clinica_app

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS personal (
   apellidos VARCHAR(100) NOT NULL,
   rol tipo_personal NOT NULL,
   activo BOOLEAN DEFAULT TRUE
+  contrasena VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS fichas_clinicas (
@@ -43,7 +44,7 @@ INSERT INTO pacientes (rut, nombres, apellidos, fecha_nacimiento) VALUES
 ('11111111-1', 'Juan', 'Perez', '1990-01-01'),
 ('22222222-2', 'Maria', 'Gomez', '1992-02-02');
 
-INSERT INTO personal (rut, nombres, apellidos, rol) VALUES 
-('66666666-6', 'Carlos', 'Medina', 'MEDICO'),
-('77777777-7', 'Laura', 'Sanchez', 'ENFERMERA'),
-('88888888-8', 'Roberto', 'Admin', 'ADMINISTRATIVO');
+INSERT INTO personal (rut, nombres, apellidos, rol, contrasena) VALUES 
+('66666666-6', 'Carlos', 'Medina', 'MEDICO', '1234'),
+('77777777-7', 'Laura', 'Sanchez', 'ENFERMERA', '5678'),
+('88888888-8', 'Roberto', 'Admin', 'ADMINISTRATIVO', 'admin');

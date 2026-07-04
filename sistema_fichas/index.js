@@ -156,5 +156,39 @@ app.delete('/api/atenciones/:id', verificarPersonalAutorizado, async (req, res) 
     }
 });
 
+app.post('/api/auth/login', async (req, res) => {
+    const { id, contrasena } = req.body;
+
+    if (!id || !contrasena) { //evita datos vacios
+        return res.status(400).json({ error: "Falta el ID o la contraseña" });
+    }
+
+    try {
+        const result = await pool.query(
+            'SELECT id, nombres, rol, activo FROM personal WHERE id = $1 AND contrasena = $2',
+            [id, contrasena]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: "ID o contraseña incorrectos" });
+        }
+
+        const usuario = result.rows[0];
+
+        res.status(200).json({
+            mensaje: "Login exitoso",
+            usuario: {
+                id: usuario.id,
+                nombres: usuario.nombres,
+                rol: usuario.rol
+            }
+        });
+
+    } catch (error) {
+        console.error("Error en el login:", error);
+        res.status(500).json({ error: "Error interno del servidor al validar credenciales" });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Sistema de Fichas corriendo en puerto ${PORT}`));

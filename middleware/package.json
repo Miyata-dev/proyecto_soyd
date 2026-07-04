@@ -1,0 +1,18 @@
+{
+  "name": "middleware-centro-salud",
+  "version": "1.0.0",
+  "description": "Middleware central de enrutamiento y transformación entre Bodega (App3) y los sistemas de atención (App1 Tickets, App2 Fichas).",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

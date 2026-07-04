@@ -135,6 +135,18 @@ services:
     networks:
       - clinica_network
 
+frontend_clinica:
+    build:
+      context: ./frontend-clinica
+    container_name: frontend_clinica_app
+    restart: always
+    ports:
+      - "5173:80" # Mapea el puerto 80 del contenedor al 5173 de tu Mac
+    depends_on:
+      - api_gateway
+    networks:
+      - clinica_network
+
 volumes:
   mariadb_tickets_data:
   postgres_fichas_data:

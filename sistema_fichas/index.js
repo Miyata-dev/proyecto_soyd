@@ -157,20 +157,20 @@ app.delete('/api/atenciones/:id', verificarPersonalAutorizado, async (req, res) 
 });
 
 app.post('/api/auth/login', async (req, res) => {
-    const { id, contrasena } = req.body;
+    const { nombres, contrasena } = req.body;
 
-    if (!id || !contrasena) { //evita datos vacios
-        return res.status(400).json({ error: "Falta el ID o la contraseña" });
+    if (!nombres || !contrasena) {
+        return res.status(400).json({ error: "Falta el nombre o la contraseña" });
     }
 
     try {
         const result = await pool.query(
-            'SELECT id, nombres, rol, activo FROM personal WHERE id = $1 AND contrasena = $2',
-            [id, contrasena]
+            'SELECT id, nombres, apellidos, rol, activo FROM personal WHERE nombres = $1 AND contrasena = $2',
+            [nombres, contrasena]
         );
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: "ID o contraseña incorrectos" });
+            return res.status(401).json({ error: "Nombre de usuario o contraseña incorrectos" });
         }
 
         const usuario = result.rows[0];
@@ -180,6 +180,7 @@ app.post('/api/auth/login', async (req, res) => {
             usuario: {
                 id: usuario.id,
                 nombres: usuario.nombres,
+                apellidos: usuario.apellidos,
                 rol: usuario.rol
             }
         });

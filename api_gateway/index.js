@@ -6,6 +6,10 @@ const app = express();
 app.use(cors());
 
 const verificarIdentidad = async (req, res, next) => {
+    if (req.path === '/api/auth/login') {
+        return next();
+    }
+
     const userId = req.headers['x-user-id'];
     const userRoleClient = req.headers['x-user-role'];
 
@@ -87,6 +91,12 @@ app.use('/api/tickets', createProxyMiddleware({
 
 app.use('/api/bodega', createProxyMiddleware({
     target: process.env.URL_BODEGA || 'http://localhost:3002',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
+
+app.use('/api/auth', createProxyMiddleware({
+    target: process.env.URL_FICHAS || 'http://sistema_fichas_app:3000',
     changeOrigin: true,
     onProxyReq: fixProxyHeaders
 }));

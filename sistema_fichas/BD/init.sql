@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS personal (
   nombres VARCHAR(100) NOT NULL,
   apellidos VARCHAR(100) NOT NULL,
   rol tipo_personal NOT NULL,
-  activo BOOLEAN DEFAULT TRUE
+  activo BOOLEAN DEFAULT TRUE,
   contrasena VARCHAR(255) NOT NULL
 );
 

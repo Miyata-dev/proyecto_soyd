@@ -12,3 +12,20 @@ yarn-debug.log
 # Carpetas de VS Code
 .vscode/
 package-lock.json
+
+# Build / artefactos Java
+/target/
+**/target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Archivos de Maven / Gradle
+.mvn/
+.gradle/
+build/
+
+# Archivos de entorno locales
+.env
+*.local

@@ -40,13 +40,55 @@ app.get('/api/auth/verify', async (req, res) => {
     }
 });
 
-// 1. GET: Obtener todas las fichas
+// 1. GET: Obtener todas las fichas (con datos reales del paciente asociado)
 app.get('/api/fichas', verificarPersonalAutorizado, async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM fichas_clinicas ORDER BY fecha_creacion DESC');
+        const query = `
+            SELECT f.id, f.paciente_id, f.fecha_creacion,
+                   p.nombres AS paciente_nombre, p.apellidos AS paciente_apellido, p.rut AS paciente_rut
+            FROM fichas_clinicas f
+            JOIN pacientes p ON f.paciente_id = p.id
+            ORDER BY f.fecha_creacion DESC
+        `;
+        const result = await pool.query(query);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: 'Error al obtener las fichas' });
+    }
+});
+
+// GET: Obtener el listado de pacientes (para seleccionarlos al crear fichas o tickets)
+app.get('/api/pacientes', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, rut, nombres, apellidos, fecha_nacimiento FROM pacientes ORDER BY nombres ASC');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: 'Error al obtener los pacientes' });
+    }
+});
+
+// POST: Registrar un paciente nuevo (usado por recepción o personal clínico).
+// Este endpoint pertenece exclusivamente a App2: no requiere ni provoca
+// ninguna llamada hacia App1 (Tickets). El aislamiento de red entre ambas
+// aplicaciones se mantiene intacto.
+app.post('/api/pacientes', async (req, res) => {
+    const { rut, nombres, apellidos, fecha_nacimiento } = req.body;
+
+    if (!rut || !nombres || !apellidos || !fecha_nacimiento) {
+        return res.status(400).json({ error: 'Debes completar RUT, nombres, apellidos y fecha de nacimiento.' });
+    }
+
+    try {
+        const result = await pool.query(
+            'INSERT INTO pacientes (rut, nombres, apellidos, fecha_nacimiento) VALUES ($1, $2, $3, $4) RETURNING *',
+            [rut, nombres, apellidos, fecha_nacimiento]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'Ya existe un paciente registrado con ese RUT.' });
+        }
+        res.status(500).json({ error: 'Error al registrar el paciente' });
     }
 });
 
@@ -71,6 +113,36 @@ app.post('/api/fichas', verificarPersonalAutorizado, async (req, res) => {
         res.status(201).json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: 'Error al crear la ficha clínica' });
+    }
+});
+
+// 2b. DELETE: Eliminar una ficha clínica junto con su historial de atenciones
+app.delete('/api/fichas/:id', verificarPersonalAutorizado, async (req, res) => {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        // Primero borramos las atenciones asociadas (la FK lo exige),
+        // luego la ficha. Todo dentro de una transacción para que sea
+        // todo o nada.
+        await client.query('DELETE FROM atenciones_medicas WHERE ficha_id = $1', [id]);
+        const result = await client.query('DELETE FROM fichas_clinicas WHERE id = $1 RETURNING *', [id]);
+
+        if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Ficha no encontrada' });
+        }
+
+        await client.query('COMMIT');
+        res.json({
+            mensaje: 'Ficha eliminada con éxito (junto con su historial de atenciones)',
+            ficha_eliminada: result.rows[0]
+        });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Error al eliminar la ficha' });
+    } finally {
+        client.release();
     }
 });
 

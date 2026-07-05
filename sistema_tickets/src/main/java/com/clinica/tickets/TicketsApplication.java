@@ -1,5 +1,7 @@
 package com.clinica.tickets;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -28,6 +30,7 @@ public class TicketsApplication {
     private static final String TICKETS_CACHE_KEY = "tickets:all";
     private final JdbcTemplate jdbcTemplate;
     private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     public TicketsApplication(JdbcTemplate jdbcTemplate, StringRedisTemplate redisTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -38,13 +41,21 @@ public class TicketsApplication {
     public List<Map<String, Object>> getAllTickets() {
         String cached = redisTemplate.opsForValue().get(TICKETS_CACHE_KEY);
         if (cached != null) {
-            return List.of();
+            try {
+                return objectMapper.readValue(cached, new TypeReference<List<Map<String, Object>>>() {});
+            } catch (Exception e) {
+                // Si el JSON en caché no se puede leer, seguimos y recalculamos desde la BD.
+            }
         }
 
         List<Map<String, Object>> tickets = jdbcTemplate.queryForList(
                 "SELECT id, paciente_id, area_id, numero_atencion, estado, fecha_creacion, fecha_llamado FROM tickets ORDER BY fecha_creacion DESC"
         );
-        redisTemplate.opsForValue().set(TICKETS_CACHE_KEY, "1", Duration.ofMinutes(5));
+        try {
+            redisTemplate.opsForValue().set(TICKETS_CACHE_KEY, objectMapper.writeValueAsString(tickets), Duration.ofMinutes(5));
+        } catch (Exception e) {
+            // Si falla la serialización, simplemente no cacheamos esta vez.
+        }
         return tickets;
     }
 
@@ -77,6 +88,26 @@ public class TicketsApplication {
     public ResponseEntity<?> callTicket(@PathVariable String id) {
         int updated = jdbcTemplate.update(
                 "UPDATE tickets SET estado = 'LLAMADO', fecha_llamado = CURRENT_TIMESTAMP WHERE id = ?",
+                id
+        );
+
+        if (updated == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Ticket no encontrado"));
+        }
+
+        invalidateTicketsCache();
+
+        Map<String, Object> updatedTicket = jdbcTemplate.queryForMap(
+                "SELECT id, paciente_id, area_id, numero_atencion, estado, fecha_creacion, fecha_llamado FROM tickets WHERE id = ?",
+                id
+        );
+        return ResponseEntity.ok(updatedTicket);
+    }
+
+    @PatchMapping("/api/tickets/{id}/atender")
+    public ResponseEntity<?> attendTicket(@PathVariable String id) {
+        int updated = jdbcTemplate.update(
+                "UPDATE tickets SET estado = 'ATENDIDO' WHERE id = ?",
                 id
         );
 

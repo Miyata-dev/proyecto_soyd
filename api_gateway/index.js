@@ -83,14 +83,24 @@ app.use('/api/atenciones', createProxyMiddleware({
     onProxyReq: fixProxyHeaders
 }));
 
+// OJO: aquí quitamos "changeOrigin: true". Tomcat (el servidor Java de
+// tickets) rechaza el header Host cuando contiene guion bajo, y
+// "sistema_tickets_app" lo tiene. Sin changeOrigin, el proxy conserva
+// el Host original de la petición (localhost:8080), que sí es válido.
 app.use('/api/tickets', createProxyMiddleware({
     target: process.env.URL_TICKETS || 'http://localhost:3001',
-    changeOrigin: true,
+    changeOrigin: false,
     onProxyReq: fixProxyHeaders
 }));
 
 app.use('/api/bodega', createProxyMiddleware({
     target: process.env.URL_BODEGA || 'http://localhost:3002',
+    changeOrigin: true,
+    onProxyReq: fixProxyHeaders
+}));
+
+app.use('/api/pacientes', createProxyMiddleware({
+    target: process.env.URL_FICHAS || 'http://localhost:3000',
     changeOrigin: true,
     onProxyReq: fixProxyHeaders
 }));
@@ -103,3 +113,4 @@ app.use('/api/auth', createProxyMiddleware({
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`API Gateway ejecutándose en puerto ${PORT}`));
+

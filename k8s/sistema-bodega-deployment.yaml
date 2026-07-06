@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+    kompose.version: 1.38.0 (a8f5d1cbd)
+  labels:
+    io.kompose.service: sistema-bodega
+  name: sistema-bodega
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: sistema-bodega
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+        kompose.version: 1.38.0 (a8f5d1cbd)
+      labels:
+        io.kompose.service: sistema-bodega
+    spec:
+      containers:
+        - env:
+            - name: DB_MASTER_HOST
+              value: bodega-db
+            - name: DB_NAME
+              value: bodega_db
+            - name: DB_PASSWORD
+              value: secretpassword
+            - name: DB_REPLICA_HOST
+              value: bodega-db
+            - name: DB_USER
+              value: admin
+            - name: PORT
+              value: "5000"
+          image: sistema-bodega:local
+          name: sistema-bodega
+          ports:
+            - containerPort: 5000
+              protocol: TCP
+      restartPolicy: Always

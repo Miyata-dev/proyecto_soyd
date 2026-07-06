@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+    kompose.version: 1.38.0 (a8f5d1cbd)
+  labels:
+    io.kompose.service: sistema-fichas
+  name: sistema-fichas
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      io.kompose.service: sistema-fichas
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+        kompose.version: 1.38.0 (a8f5d1cbd)
+      labels:
+        io.kompose.service: sistema-fichas
+    spec:
+      containers:
+        - env:
+            - name: DB_HOST
+              value: fichas-db
+            - name: DB_NAME
+              value: fichas_db
+            - name: DB_PASSWORD
+              value: secretpassword
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: admin
+            - name: PORT
+              value: "3000"
+          image: sistema-fichas:local
+          name: sistema-fichas
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+      restartPolicy: Always

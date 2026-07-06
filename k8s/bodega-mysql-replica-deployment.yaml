@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+    kompose.version: 1.38.0 (a8f5d1cbd)
+  labels:
+    io.kompose.service: bodega-mysql-replica
+  name: bodega-mysql-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: bodega-mysql-replica
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+        kompose.version: 1.38.0 (a8f5d1cbd)
+      labels:
+        io.kompose.service: bodega-mysql-replica
+    spec:
+      containers:
+        - env:
+            - name: MYSQL_DATABASE
+              value: bodega_db
+            - name: MYSQL_PASSWORD
+              value: secretpassword
+            - name: MYSQL_ROOT_PASSWORD
+              value: rootpassword
+            - name: MYSQL_USER
+              value: admin
+          image: bodega-db-replica:local
+          name: bodega-mysql-replica
+          ports:
+            - containerPort: 3306
+              protocol: TCP
+      restartPolicy: Always

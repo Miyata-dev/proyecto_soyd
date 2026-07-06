@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const verificarIdentidad = async (req, res, next) => {
     if (req.path === '/api/auth/login') {
@@ -18,10 +19,13 @@ const verificarIdentidad = async (req, res, next) => {
     }
 
     try {
-        // Le preguntamos al Sistema de Fichas (que tiene la tabla 'personal') si el usuario existe
-        const urlFichas = process.env.URL_FICHAS || 'http://localhost:3000';
+        const urlFichas = process.env.URL_FICHAS || 'http://sistema-fichas:3000';
         const response = await fetch(`${urlFichas}/api/auth/verify`, {
-            headers: { 'x-user-id': userId }
+            method: 'GET', // Aseguramos el método
+            headers: {
+                'x-user-id': userId,
+                'Content-Type': 'application/json'
+            }
         });
 
         if (!response.ok) {
@@ -89,7 +93,7 @@ app.use('/api/atenciones', createProxyMiddleware({
 // el Host original de la petición (localhost:8080), que sí es válido.
 app.use('/api/tickets', createProxyMiddleware({
     target: process.env.URL_TICKETS || 'http://localhost:3001',
-    changeOrigin: false,
+    changeOrigin: true,
     onProxyReq: fixProxyHeaders
 }));
 
@@ -106,7 +110,7 @@ app.use('/api/pacientes', createProxyMiddleware({
 }));
 
 app.use('/api/auth', createProxyMiddleware({
-    target: process.env.URL_FICHAS || 'http://sistema_fichas_app:3000',
+    target: process.env.URL_FICHAS || 'http://sistema-fichas:3000',
     changeOrigin: true,
     onProxyReq: fixProxyHeaders
 }));

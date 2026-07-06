@@ -1,3 +1,22 @@
+# Borra TODO lo que esté corriendo en el clúster actualmente
+kubectl delete all --all
+rm -rf k8s/* --limpia manifestos
+
+1) primer paso
+minikube start //inicia el cluster local
+eval $(minikube docker-env) conecta Docker de la terminal con Minikube
+docker-compose build // compila las imagenes dentro de minikube
+
+2) paso dos
+mkdir k8s
+kompose convert -f docker-compose.yml -o k8s/ // docker-compose -> guarda los archivos resultantes en la carpeta k8s/
+kubectl apply -f k8s/ aplica el cluster solo los archivos generados en esa carpeta
+kubectl get pods -w Monitorea en vivo hasta que todos los servicios digan "Running" (Ctrl+C para salir
+
+3) port-fordwaring
+kubectl port-forward svc/api-gateway 8080:8080 //exposes el puerto del API Gateway hacia tu máquina local
+kubectl port-forward svc/frontend-clinica 5173:5173 //expone el frontend para levantar la interfaz
+
 docker-compose up --build 
 docker ps
 docker compose down

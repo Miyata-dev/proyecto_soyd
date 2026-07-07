@@ -9,51 +9,35 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger("SistemaBodega")
 
-# Configuración de Base de Datos 
 DB_USER = os.getenv('DB_USER', 'admin')
 DB_PASS = os.getenv('DB_PASSWORD', 'secretpassword')
 DB_NAME = os.getenv('DB_NAME', 'bodega_db')
 
-# Nombres de los servicios en Docker
 MASTER_HOST = os.getenv('DB_MASTER_HOST', 'bodega_mysql_master')
 REPLICA_HOST = os.getenv('DB_REPLICA_HOST', 'bodega_mysql_replica')
 
-def get_db_replica():
-    """Conecta a la RÉPLICA para operaciones de lectura"""
-    try:
-        return mysql.connector.connect(
-            host=REPLICA_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, connection_timeout=3
-        )
-    except Error as e:
-        logger.warning(f"Réplica inaccesible ({e}). Usando Master como respaldo para lectura...")
-        return mysql.connector.connect(
-            host=MASTER_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, connection_timeout=3
-        )
-
-def get_db_master():
-    """Conecta al MASTER exclusivamente para operaciones de escritura (Despachos/Ingresos)."""
+def get_db_connection(host_target):
+    """Retorna una conexión limpia al host especificado con un timeout acotado."""
     return mysql.connector.connect(
-        host=MASTER_HOST, user=DB_USER, password=DB_PASS, database=DB_NAME, connection_timeout=3
+        host=host_target, user=DB_USER, password=DB_PASS, database=DB_NAME, connection_timeout=2
     )
 
 @app.route('/api/bodega/inventario', methods=['GET'])
 def obtener_inventario():
     """
-    MODO TOLERANCIA A FALLOS (ACTIVO-PASIVO):
-    Intenta leer siempre del Master para evitar desincronización (Split-Brain).
-    Si el Master cae, el except atrapa el error y conmuta automáticamente a la Réplica.
+    Muestra el inventario consultando prioritariamente al Master.
+    Si el Master no está disponible, conmuta a la Réplica ofreciendo Alta Disponibilidad.
     """
     modo_actual = "NORMAL_MASTER"
     try:
-        conn = get_db_master()
-    except Error as e_master:
-        logger.warning(f"Master caído ({e_master}). Conmutando a Réplica...")
+        conn = get_db_connection(MASTER_HOST)
+    except Error:
+        logger.warning("Master inaccesible para lectura. Conmutando failover a Réplica...")
         try:
-            conn = get_db_replica()
+            conn = get_db_connection(REPLICA_HOST)
             modo_actual = "DEGRADADO_REPLICA"
-        except Error as e_replica:
-            logger.error("Fallo crítico: Master y Réplica caídos.")
-            return jsonify({"error": "Servicio de inventario temporalmente inaccesible"}), 500
+        except Error:
+            return jsonify({"error": "Almacenamiento de datos completamente inaccesible"}), 500
 
     try:
         cursor = conn.cursor(dictionary=True)
@@ -70,13 +54,14 @@ def obtener_inventario():
         conn.close()
         return jsonify({"modo": modo_actual, "total": len(productos), "data": productos}), 200
     except Error as e:
-        return jsonify({"error": "Error al ejecutar la consulta de inventario"}), 500
+        return jsonify({"error": f"Error en consulta: {str(e)}"}), 500
 
 @app.route('/api/bodega/despachar', methods=['POST'])
 def despachar_insumo():
     """
-    MODO FAILOVER ACTIVO:
-    Intenta escribir en el Master. Si falla, conmuta y escribe en la Réplica.
+    CRUD SINCRONIZADO A NIVEL DE APLICACIÓN:
+    Aplica los cambios en el Master y propaga inmediatamente la actualización a la Réplica
+    para mantener la consistencia entre las copias (Página 4 del PDF).
     """
     data = request.json
     codigo = data.get('codigo_producto')
@@ -87,82 +72,92 @@ def despachar_insumo():
     if not codigo:
         return jsonify({"error": "Debe especificar el codigo_producto"}), 400
 
-    modo_usado = "MASTER"
-    try:
-        conn = get_db_master()
-    except Error as e_master:
-        logger.warning(f"Master caído en escritura ({e_master}). Failover a Réplica...")
-        try:
-            conn = get_db_replica()
-            modo_usado = "REPLICA_PROMOVIDA"
-        except Error as e_replica:
-            logger.critical("Fallo total: Ni Master ni Réplica están disponibles.")
-            return jsonify({"error": "Base de datos totalmente inaccesible"}), 500
+    master_conn = None
+    replica_conn = None
 
     try:
-        conn.autocommit = False 
-        cursor = conn.cursor(dictionary=True)
-        
-        # 1. Verificar stock actual del insumo
-        cursor.execute("SELECT id, cantidad_stock, nombre_producto FROM inventario WHERE codigo_producto = %s FOR UPDATE", (codigo,))
-        item = cursor.fetchone()
-        
+        master_conn = get_db_connection(MASTER_HOST)
+        master_conn.autocommit = False
+    except Error as e:
+        logger.critical(f"Master fuera de línea. Bloqueando escritura para evitar divergencia (Split-Brain): {e}")
+        return jsonify({
+            "status": "BLOQUEADO",
+            "error": "Escritura deshabilitada temporalmente por caída del nodo principal."
+        }), 503
+
+    try:
+        replica_conn = get_db_connection(REPLICA_HOST)
+        replica_conn.autocommit = False
+    except Error:
+        logger.warning("Réplica fuera de línea. La actualización se realizará en modo degradado solo en el Master.")
+
+    try:
+        # Validación de Stock e inserción en el Master
+        master_cursor = master_conn.cursor(dictionary=True)
+        master_cursor.execute("SELECT id, cantidad_stock, nombre_producto FROM inventario WHERE codigo_producto = %s FOR UPDATE", (codigo,))
+        item = master_cursor.fetchone()
+
         if not item:
-            conn.rollback()
+            master_conn.rollback()
+            if replica_conn: replica_conn.rollback()
             return jsonify({"error": "Producto no encontrado en bodega"}), 404
-            
-        if item['cantidad_stock'] < cantidad:
-            conn.rollback()
-            return jsonify({"error": f"Stock insuficiente para {item['nombre_producto']}. Stock actual: {item['cantidad_stock']}"}), 400
 
-        # 2. Descontar del inventario 
+        if item['cantidad_stock'] < cantidad:
+            master_conn.rollback()
+            if replica_conn: replica_conn.rollback()
+            return jsonify({"error": f"Stock insuficiente para {item['nombre_producto']}"}), 400
+
         nuevo_stock = item['cantidad_stock'] - cantidad
-        cursor.execute("UPDATE inventario SET cantidad_stock = %s WHERE id = %s", (nuevo_stock, item['id']))
-        
-        # 3. Registrar el historial 
+
+        # 3. Aplicar cambios en el Master
+        master_cursor.execute("UPDATE inventario SET cantidad_stock = %s WHERE id = %s", (nuevo_stock, item['id']))
         query_mov = """
             INSERT INTO movimientos_bodega (inventario_id, tipo_movimiento, cantidad, personal_solicitante_id, observaciones)
             VALUES (%s, 'EGRESO', %s, %s, %s)
         """
-        cursor.execute(query_mov, (item['id'], cantidad, solicitante_id, f"{observaciones} (Ejecutado en {modo_usado})"))
+        master_cursor.execute(query_mov, (item['id'], cantidad, solicitante_id, observaciones))
+
+        # (Actualización Sincrónica)
+        if replica_conn:
+            try:
+                replica_cursor = replica_conn.cursor(dictionary=True)
+                # Sincronizamos el stock exacto calculado para asegurar Consistencia Secuencial o Estricta
+                replica_cursor.execute("UPDATE inventario SET cantidad_stock = %s WHERE codigo_producto = %s", (nuevo_stock, codigo))
+                
+                # Sincronizamos el registro de auditoría en la réplica
+                replica_cursor.execute("SELECT id FROM inventario WHERE codigo_producto = %s", (codigo,))
+                replica_item = replica_cursor.fetchone()
+                if replica_item:
+                    replica_cursor.execute(query_mov, (replica_item['id'], cantidad, solicitante_id, f"{observaciones} (Sincronizado)"))
+                
+                replica_conn.commit()
+                replica_cursor.close()
+                logger.info("Propagación del método de actualización completada con éxito en la Réplica.")
+            except Error as e_replica:
+                logger.error(f"Fallo al escribir en la Réplica. Abortando transacción sincrónica: {e_replica}")
+                replica_conn.rollback()
+                # Opcional: puedes decidir si dejas pasar la escritura en el master o tiras error. 
+                # Para asegurar consistencia estricta ante fallas de la réplica, lanzamos excepción:
+                raise e_replica
         
-        # Confirmamos cambios
-        conn.commit()
-        cursor.close()
-        conn.close()
+        # Si todo anduvo bien en los nodos activos, confirmamos la transacción global
+        master_conn.commit()
+        master_cursor.close()
         
-        logger.info(f"Despacho exitoso en modo {modo_usado}: {cantidad} unidades de {codigo}.")
+        if master_conn: master_conn.close()
+        if replica_conn: replica_conn.close()
+
         return jsonify({
-            "mensaje": f"Despacho realizado con éxito (Modo: {modo_usado})",
+            "mensaje": "Despacho realizado y sincronizado en los nodos activos con éxito",
             "codigo_producto": codigo,
             "stock_restante": nuevo_stock
         }), 200
 
-    except Error as e:
-        if 'conn' in locals() and conn.is_connected():
-            conn.rollback()
-            conn.close()
-        return jsonify({"error": f"Error procesando el despacho: {str(e)}"}), 500
-
-@app.route('/api/bodega/status', methods=['GET'])
-def status_check():
-    """Monitoreo para el Orquestador y el Middleware."""
-    master_ok, replica_ok = False, False
-    try:
-        conn = get_db_master(); conn.close(); master_ok = True
-    except: pass
-    try:
-        conn = get_db_replica(); conn.close(); replica_ok = True
-    except: pass
-
-    status_code = 200 if (master_ok or replica_ok) else 503
-    return jsonify({
-        "modulo": "Aplicación 3 - Sistema de Bodega e Inventario",
-        "db_master_status": "ONLINE" if master_ok else "OFFLINE",
-        "db_replica_status": "ONLINE" if replica_ok else "OFFLINE",
-        "modo_operativo": "NORMAL (Lectura/Escritura)" if master_ok else ("DEGRADADO (Solo Lectura)" if replica_ok else "CAÍDO")
-    }), status_code
+    except Exception as e:
+        if master_conn: master_conn.rollback()
+        if replica_conn: replica_conn.rollback()
+        logger.error(f"Transacción abortada debido a error de consistencia: {str(e)}")
+        return jsonify({"error": f"Error procesando la transacción distribuida: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    logger.info("Iniciando Módulo de Bodega Clínica (Puerto 5000)...")
     app.run(host='0.0.0.0', port=5000)

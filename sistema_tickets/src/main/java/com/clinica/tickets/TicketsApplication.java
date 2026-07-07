@@ -27,6 +27,7 @@ import java.util.UUID;
 @RestController
 public class TicketsApplication {
 
+    // clave usada para la cache de tickets
     private static final String TICKETS_CACHE_KEY = "tickets:all";
     private final JdbcTemplate jdbcTemplate;
     private final StringRedisTemplate redisTemplate;
@@ -37,8 +38,10 @@ public class TicketsApplication {
         this.redisTemplate = redisTemplate;
     }
 
+    // devuelve todos los tickets disponibles
     @GetMapping("/api/tickets")
     public List<Map<String, Object>> getAllTickets() {
+        // busca los tickets en cache primero
         String cached = redisTemplate.opsForValue().get(TICKETS_CACHE_KEY);
         if (cached != null) {
             try {
@@ -48,6 +51,7 @@ public class TicketsApplication {
             }
         }
 
+        // consulta los tickets desde la base de datos
         List<Map<String, Object>> tickets = jdbcTemplate.queryForList(
                 "SELECT id, paciente_id, area_id, numero_atencion, estado, fecha_creacion, fecha_llamado FROM tickets ORDER BY fecha_creacion DESC"
         );
@@ -59,13 +63,16 @@ public class TicketsApplication {
         return tickets;
     }
 
+    // crea un nuevo ticket para un paciente
     @PostMapping("/api/tickets")
     public ResponseEntity<?> createTicket(@RequestBody Map<String, Object> body) {
+        // crea un nuevo ticket con un id unico
         String id = UUID.randomUUID().toString();
         String pacienteId = String.valueOf(body.get("paciente_id"));
         Integer areaId = Integer.valueOf(String.valueOf(body.get("area_id")));
         String numeroAtencion = String.valueOf(body.get("numero_atencion"));
 
+        // guarda el ticket con estado en espera
         jdbcTemplate.update(
                 "INSERT INTO tickets (id, paciente_id, area_id, numero_atencion, estado) VALUES (?, ?, ?, ?, ?)",
                 id, pacienteId, areaId, numeroAtencion, "EN_ESPERA"
@@ -84,8 +91,10 @@ public class TicketsApplication {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    // cambia el estado del ticket a llamado
     @PatchMapping("/api/tickets/{id}/llamar")
     public ResponseEntity<?> callTicket(@PathVariable String id) {
+        // cambia el estado a llamado
         int updated = jdbcTemplate.update(
                 "UPDATE tickets SET estado = 'LLAMADO', fecha_llamado = CURRENT_TIMESTAMP WHERE id = ?",
                 id
@@ -104,8 +113,10 @@ public class TicketsApplication {
         return ResponseEntity.ok(updatedTicket);
     }
 
+    // cambia el estado del ticket a atendido
     @PatchMapping("/api/tickets/{id}/atender")
     public ResponseEntity<?> attendTicket(@PathVariable String id) {
+        // marca el ticket como atendido
         int updated = jdbcTemplate.update(
                 "UPDATE tickets SET estado = 'ATENDIDO' WHERE id = ?",
                 id
@@ -124,8 +135,10 @@ public class TicketsApplication {
         return ResponseEntity.ok(updatedTicket);
     }
 
+    // elimina un ticket existente
     @DeleteMapping("/api/tickets/{id}")
     public ResponseEntity<?> deleteTicket(@PathVariable String id) {
+        // elimina un ticket si existe
         int deleted = jdbcTemplate.update("DELETE FROM tickets WHERE id = ?", id);
         if (deleted == 0) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Ticket no encontrado"));
@@ -135,6 +148,7 @@ public class TicketsApplication {
     }
 
     public void invalidateTicketsCache() {
+        // limpia la cache al cambiar datos
         redisTemplate.delete(TICKETS_CACHE_KEY);
     }
 

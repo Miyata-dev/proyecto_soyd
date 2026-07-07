@@ -39,11 +39,23 @@ def get_db_master():
 @app.route('/api/bodega/inventario', methods=['GET'])
 def obtener_inventario():
     """
-    MODO LECTURA: Lee desde la Réplica. 
-    Hacemos un JOIN con categorias_insumos para que el frontend vea el nombre de la categoría.
+    MODO TOLERANCIA A FALLOS (ACTIVO-PASIVO):
+    Intenta leer siempre del Master para evitar desincronización (Split-Brain).
+    Si el Master cae, el except atrapa el error y conmuta automáticamente a la Réplica.
     """
+    modo_actual = "NORMAL_MASTER"
     try:
-        conn = get_db_replica()
+        conn = get_db_master()
+    except Error as e_master:
+        logger.warning(f"Master caído ({e_master}). Conmutando a Réplica...")
+        try:
+            conn = get_db_replica()
+            modo_actual = "DEGRADADO_REPLICA"
+        except Error as e_replica:
+            logger.error("Fallo crítico: Master y Réplica caídos.")
+            return jsonify({"error": "Servicio de inventario temporalmente inaccesible"}), 500
+
+    try:
         cursor = conn.cursor(dictionary=True)
         query = """
             SELECT i.id, i.codigo_producto, i.nombre_producto, i.cantidad_stock, 
@@ -56,16 +68,15 @@ def obtener_inventario():
         productos = cursor.fetchall()
         cursor.close()
         conn.close()
-        return jsonify({"modo": "LECTURA_ACTIVA", "total": len(productos), "data": productos}), 200
+        return jsonify({"modo": modo_actual, "total": len(productos), "data": productos}), 200
     except Error as e:
-        logger.error(f"Fallo crítico: No se pudo leer ni de Réplica ni de Master: {e}")
-        return jsonify({"error": "Servicio de inventario temporalmente inaccesible"}), 500
+        return jsonify({"error": "Error al ejecutar la consulta de inventario"}), 500
 
 @app.route('/api/bodega/despachar', methods=['POST'])
 def despachar_insumo():
     """
-    MODO ESCRITURA: Requiere el Master.
-    Si el Master cae -> Captura el error y activa el MODO DEGRADADO.
+    MODO FAILOVER ACTIVO:
+    Intenta escribir en el Master. Si falla, conmuta y escribe en la Réplica.
     """
     data = request.json
     codigo = data.get('codigo_producto')
@@ -76,8 +87,19 @@ def despachar_insumo():
     if not codigo:
         return jsonify({"error": "Debe especificar el codigo_producto"}), 400
 
+    modo_usado = "MASTER"
     try:
         conn = get_db_master()
+    except Error as e_master:
+        logger.warning(f"Master caído en escritura ({e_master}). Failover a Réplica...")
+        try:
+            conn = get_db_replica()
+            modo_usado = "REPLICA_PROMOVIDA"
+        except Error as e_replica:
+            logger.critical("Fallo total: Ni Master ni Réplica están disponibles.")
+            return jsonify({"error": "Base de datos totalmente inaccesible"}), 500
+
+    try:
         conn.autocommit = False 
         cursor = conn.cursor(dictionary=True)
         
@@ -93,39 +115,34 @@ def despachar_insumo():
             conn.rollback()
             return jsonify({"error": f"Stock insuficiente para {item['nombre_producto']}. Stock actual: {item['cantidad_stock']}"}), 400
 
-        # 2. Descontar del inventario principal
+        # 2. Descontar del inventario 
         nuevo_stock = item['cantidad_stock'] - cantidad
         cursor.execute("UPDATE inventario SET cantidad_stock = %s WHERE id = %s", (nuevo_stock, item['id']))
         
-        # 3. Registrar el historial en movimientos_bodega (Auditoría)
+        # 3. Registrar el historial 
         query_mov = """
             INSERT INTO movimientos_bodega (inventario_id, tipo_movimiento, cantidad, personal_solicitante_id, observaciones)
             VALUES (%s, 'EGRESO', %s, %s, %s)
         """
-        cursor.execute(query_mov, (item['id'], cantidad, solicitante_id, observaciones))
+        cursor.execute(query_mov, (item['id'], cantidad, solicitante_id, f"{observaciones} (Ejecutado en {modo_usado})"))
         
-        # Confirmamos ambos cambios al mismo tiempo
+        # Confirmamos cambios
         conn.commit()
-        
         cursor.close()
         conn.close()
         
-        logger.info(f"Despacho exitoso: {cantidad} unidades de {codigo} para solicitante {solicitante_id}.")
+        logger.info(f"Despacho exitoso en modo {modo_usado}: {cantidad} unidades de {codigo}.")
         return jsonify({
-            "mensaje": "Despacho realizado y registrado en auditoría con éxito",
+            "mensaje": f"Despacho realizado con éxito (Modo: {modo_usado})",
             "codigo_producto": codigo,
             "stock_restante": nuevo_stock
         }), 200
 
     except Error as e:
-        # Toleracnia a fallas: Si el Master cae, activamos MODO DEGRADADO.
-        logger.critical(f" [ALERTA DE CAÍDA] Falló el Master MySQL: {e}. Activando Modo Degradado.")
-        return jsonify({
-            "status": "MODO_DEGRADADO",
-            "alerta": "Servidor principal de base de datos fuera de línea (Failover en proceso).",
-            "detalle_tecnico": "Se han suspendido las escrituras y despachos para evitar inconsistencias.",
-            "accion_requerida": "El stock se puede seguir consultando en modo lectura a través de /api/bodega/inventario."
-        }), 503
+        if 'conn' in locals() and conn.is_connected():
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": f"Error procesando el despacho: {str(e)}"}), 500
 
 @app.route('/api/bodega/status', methods=['GET'])
 def status_check():

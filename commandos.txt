@@ -25,3 +25,17 @@ docker-compose down --remove-orphans
 docker exec -it shared_clinica_postgres psql -U admin -d clinica_db //obtener acceso a la clinica_db
 SELECT id, nombres, apellidos FROM pacientes; //obtener pacientes
 SELECT id, nombres, apellidos FROM personal; //obtener personal
+
+--prueba 1 Pérdida de conectividad con servidores principales (App)
+kubectl scale deployment sistema-fichas --replicas=1
+
+-- prueba 2 Interrupción del servicio de Base de Datos
+kubectl scale deployment bodega-db --replicas=0
+
+-- prueba 3 Simulación de caída del Middleware
+kubectl scale deployment api-gateway --replicas=0
+
+-- volver a la normalidad
+kubectl scale deployment sistema-fichas --replicas=2
+kubectl scale deployment bodega-db --replicas=1
+kubectl scale deployment api-gateway --replicas=1

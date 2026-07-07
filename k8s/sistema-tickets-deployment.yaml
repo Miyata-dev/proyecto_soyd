@@ -8,7 +8,7 @@ metadata:
     io.kompose.service: sistema-tickets
   name: sistema-tickets
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       io.kompose.service: sistema-tickets
@@ -30,6 +30,8 @@ spec:
               value: secretpassword
             - name: DB_PORT
               value: "3306"
+            - name: DB_REPLICA_HOST
+              value: tickets-db-replica
             - name: DB_USER
               value: admin
             - name: PORT

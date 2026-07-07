@@ -29,7 +29,7 @@ spec:
             - name: DB_PASSWORD
               value: secretpassword
             - name: DB_REPLICA_HOST
-              value: bodega-db
+              value: bodega-mysql-replica
             - name: DB_USER
               value: admin
             - name: PORT

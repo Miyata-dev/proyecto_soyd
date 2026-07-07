@@ -30,6 +30,8 @@ spec:
               value: secretpassword
             - name: DB_PORT
               value: "5432"
+            - name: DB_REPLICA_HOST
+              value: fichas-db-replica
             - name: DB_USER
               value: admin
             - name: PORT

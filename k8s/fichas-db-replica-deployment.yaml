@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+    kompose.version: 1.38.0 (a8f5d1cbd)
+  labels:
+    io.kompose.service: fichas-db-replica
+  name: fichas-db-replica
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: fichas-db-replica
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: C:\Users\chlor\AppData\Local\Microsoft\WinGet\Links\kompose.exe convert -f docker-compose.yml -o k8s/
+        kompose.version: 1.38.0 (a8f5d1cbd)
+      labels:
+        io.kompose.service: fichas-db-replica
+    spec:
+      containers:
+        - env:
+            - name: POSTGRES_DB
+              value: fichas_db
+            - name: POSTGRES_PASSWORD
+              value: secretpassword
+            - name: POSTGRES_USER
+              value: admin
+          image: fichas-db-replica:local
+          name: fichas-db-replica
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+      restartPolicy: Always
